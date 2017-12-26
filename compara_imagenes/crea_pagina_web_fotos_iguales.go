@@ -65,19 +65,25 @@ func crea_pagina_web(fdup map[uint64][]string) {
 	str_tmp := ""
 	str_tmp1 := ""
 
-	for clave, file := range fdup {
+	for _, file := range fdup {
 		str_tmp = ""
 		str_tmp1 = ""
+		
+		nom:=strings.Split(file[0],"\\")
+		nom1:=nom[len(nom)-1]
+		nombre:=strings.Split(nom1,"_")[0]
 		if len(file) > 1 {
 			str_tmp1 = `<tr style='background-color: skyblue;font-weight: bold;'>
-			<td style='background-color: skyblue;'>` + string(clave) + `</td>
+			<td style='background-color: skyblue;'>` + nombre + `</td>
 			<td style='background-color: skyblue;'></td>
 			<td style='background-color: skyblue;'></td>
 			<td style='background-color: skyblue;'></td>
 			<td style='background-color: skyblue;'></td></tr>`
 
 			for _, x := range file {
-				str_tmp = str_tmp + "<td style='font-size: 12px;color: blue;font-weight: bold;'>" + x[20:] + "<br> <img src=\"" + x + "\" style=\"width:150px;height:250px;\"> </td>"
+				nom2:=strings.Split(x,"\\")
+				nom3:=nom2[len(nom2)-1]
+				str_tmp = str_tmp + "<td style='font-size: 12px;color: blue;font-weight: bold;'>" + nom3 + "<br> <img src=\"" + x + "\" style=\"width:150px;height:250px;\"> </td>"
 			}
 
 			tabla = tabla + str_tmp1 + "<tr>" + str_tmp + "</tr>"
