@@ -7,7 +7,6 @@ import (
 
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
 	//"strings";
@@ -15,9 +14,7 @@ import (
 )
 
 func checkErr(err error) (string, error) {
-	if err != nil {
-		return "", err
-	}
+
 	return "", nil
 }
 
@@ -83,22 +80,29 @@ func ValidarUsuario(nombre string, clave string, table string) bool {
 	//fmt.Println(sqlString)
 
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
-	checkErr(err)
+	if err != nil {
+		return false
+	}
 	defer db.Close()
 
 	// query
 	rows, err := db.Query(sqlString)
-	checkErr(err)
-	
+	if err != nil {
+		return false
+	}
+
 	tot := 0
 	for rows.Next() {
 		err = rows.Scan(&tot)
-		checkErr(err)
-		fmt.Println(tot)
+		if err != nil {
+			return false
+		}
+		//	fmt.Println(tot)
 		if tot > 0 {
 			return true
 		}
 	}
+
 	return false
 }
 
