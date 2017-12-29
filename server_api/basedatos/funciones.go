@@ -4,14 +4,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sync"
-	//"crypto/md5"
-	//"encoding/hex"
+
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+
+	_ "github.com/go-sql-driver/mysql"
 	//"strings";
 	//bd "github.com/ronaldespinoza7560/go_proys/server_api/basedatos"
 )
 
-func CheckErr(err error) (string, error) {
+func checkErr(err error) (string, error) {
 	if err != nil {
 		return "", err
 	}
@@ -20,18 +23,18 @@ func CheckErr(err error) (string, error) {
 
 func GetJSON(sqlString string) (string, error) {
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
-	CheckErr(err)
+	checkErr(err)
 	defer db.Close()
 	stmt, err := db.Prepare(sqlString)
-	CheckErr(err)
+	checkErr(err)
 	defer stmt.Close()
 
 	rows, err := stmt.Query()
-	CheckErr(err)
+	checkErr(err)
 	defer rows.Close()
 
 	columns, err := rows.Columns()
-	CheckErr(err)
+	checkErr(err)
 
 	tableData := make([]map[string]interface{}, 0)
 
@@ -64,57 +67,55 @@ func GetJSON(sqlString string) (string, error) {
 	}
 
 	jsonData, err := json.Marshal(tableData)
-	CheckErr(err)
+	checkErr(err)
 
 	return string(jsonData), nil
 }
 
-func ValidarUsuario(nombre string, clave string,table string ) (string, error) {
-	var sqlString string
-	//hash:=md5.Sum([]byte(clave))
-	sqlString="select * from users where email = ? and password = '4a8a08f09d37b73795649038408b5f33'"
-	//table, nombre, hex.EncodeToString(hash[:]))
-	//fmt.Print(sqlString)
+func ValidarUsuario(nombre string, clave string, table string) bool {
+	//var sqlString string
+	hasher := md5.New()
+	hasher.Write([]byte(clave))
+	clave_md5 := hex.EncodeToString(hasher.Sum(nil))
+	//fmt.Println(clave_md5)
 
-	// s := []string{"select * from ", table, " where email = '", nombre, "' and password = '",hex.EncodeToString(hash[:]),"'"};
-	// sqlString=strings.Join(s, "");
-	// fmt.Print(sqlString)
+	sqlString := "select count(*) as tot from " + table + " where email = '" + nombre + "' and password = '" + clave_md5 + "'"
+	//fmt.Println(sqlString)
 
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
-	CheckErr(err)
+	checkErr(err)
 	defer db.Close()
-	
-	
-	var email string // we "scan" the result in here
 
-	rows, err1 := db.Query(sqlString,"b!") // WHERE number = 13
-	CheckErr(err1)
-	defer rows.Close()
-
-	for rows.Next(){
-		err = rows.Scan(&email)
-		CheckErr(err)
-		fmt.Print(email)
+	// query
+	rows, err := db.Query(sqlString)
+	checkErr(err)
+	
+	tot := 0
+	for rows.Next() {
+		err = rows.Scan(&tot)
+		checkErr(err)
+		fmt.Println(tot)
+		if tot > 0 {
+			return true
+		}
 	}
-	return email,nil
+	return false
 }
-
-
 
 func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg sync.WaitGroup) {
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
-	CheckErr(err)
+	checkErr(err)
 	defer db.Close()
 	stmt, err := db.Prepare(sqlString)
-	CheckErr(err)
+	checkErr(err)
 	defer stmt.Close()
 
 	rows, err := stmt.Query()
-	CheckErr(err)
+	checkErr(err)
 	defer rows.Close()
 
 	columns, err := rows.Columns()
-	CheckErr(err)
+	checkErr(err)
 
 	tableData := make([]map[string]interface{}, 0)
 
@@ -127,7 +128,7 @@ func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg 
 
 	for rows.Next() {
 		err := rows.Scan(scanArgs...)
-		CheckErr(err)
+		checkErr(err)
 
 		entry := make(map[string]interface{})
 		for i, col := range columns {
@@ -145,9 +146,8 @@ func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg 
 	}
 
 	jsonData, err := json.Marshal(tableData)
-	CheckErr(err)
+	checkErr(err)
 	Resultados["consulta1"] = append(Resultados["consulta1"], string(jsonData))
 	wg.Done()
 	//return string(jsonData), nil
 }
-
