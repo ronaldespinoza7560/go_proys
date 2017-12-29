@@ -91,17 +91,11 @@ func StartServer() {
 	
 	mux.HandleFunc("/login", LoginHandler)
 	
-	mux.HandleFunc("/xx", bts_alarmasHandler1)
 	// Protected Endpoints
 
 	mux.Handle("/resource", negroni.New(
 		negroni.HandlerFunc(ValidateTokenMiddleware),
 		negroni.Wrap(http.HandlerFunc(ProtectedHandler)),
-	))
-
-	mux.Handle("/bts_alarmas", negroni.New(
-		negroni.HandlerFunc(ValidateTokenMiddleware),
-		negroni.Wrap(http.HandlerFunc(bts_alarmasHandler)),
 	))
 
 	log.Println("Now listening...")
@@ -117,7 +111,6 @@ func StartServer() {
 var claim_user string
 var claim_nivel_acceso string
 var claim_accesos string
-var tabla_usuarios string = "users"
 
 func main() {
 
@@ -135,36 +128,6 @@ func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func bts_alarmasHandler(w http.ResponseWriter, r *http.Request) {
-	response := Response{""}
-	consulta := "SELECT * FROM " + "tp_suspendidos limit 20"
-	resultado, err := bd.GetJSON(consulta)
-	if err!=nil{
-		response = Response{"hubo un error en la consulta"}
-	}
-	fmt.Println(resultado)
-	fmt.Println(response)
-	//response = resultado
-	JsonResponse(resultado, w)
-
-}
-func bts_alarmasHandler1(w http.ResponseWriter, r *http.Request) {
-	response := Response{""}
-	consulta := "SELECT * FROM " + "tp_suspendidos limit 20"
-	resultado, err := bd.GetJSON(consulta)
-	if err!=nil{
-		response = Response{"hubo un error en la consulta"}
-	}
-	fmt.Println(resultado)
-	fmt.Println(response)
-
-	
-	//response = resultado
-	JsonResponse(resultado, w)
-
-}
-
-
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var user UserCredentials
@@ -177,8 +140,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	priv := bd.ValidarUsuario(user.Username, user.Password, tabla_usuarios)
+	priv := bd.ValidarUsuario("b!", "c", "users")
 	
+	//if user.Username != "someone" || user.Password != "p@ssword"{
 	if !priv.Ingreso{
 	
 		w.WriteHeader(http.StatusForbidden)

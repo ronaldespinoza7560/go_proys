@@ -68,44 +68,66 @@ func GetJSON(sqlString string) (string, error) {
 
 	return string(jsonData), nil
 }
+/**
+* valida el usuario y reponde con una structura 
+* acceso: bool
+* privilegios: string
+*/
+type privilegios struct {
+	Ingreso bool
+	Usuario string
+	Nivel_acceso string 
+	Accesos string
+}
 
-func ValidarUsuario(nombre string, clave string, table string) bool {
+func ValidarUsuario(nom string, clave string, table string) privilegios {
+	Pr:=privilegios{Ingreso:false,Usuario:nom,Nivel_acceso:"",Accesos:""}
+	
 	//var sqlString string
 	hasher := md5.New()
 	hasher.Write([]byte(clave))
 	clave_md5 := hex.EncodeToString(hasher.Sum(nil))
 	//fmt.Println(clave_md5)
 
-	sqlString := "select count(*) as tot from " + table + " where email = '" + nombre + "' and password = '" + clave_md5 + "'"
+	sqlString := "select count(*) as tot, nivel_acceso, accesos as tot from " + table + " where email = '" + nom + "' and password = '" + clave_md5 + "' limit 1"
 	//fmt.Println(sqlString)
 
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	if err != nil {
-		return false
+		return Pr
 	}
 	defer db.Close()
 
 	// query
 	rows, err := db.Query(sqlString)
 	if err != nil {
-		return false
+		return Pr
 	}
 
 	tot := 0
+	nivel_acceso :=""
+	accesos:=""
 	for rows.Next() {
-		err = rows.Scan(&tot)
+		err = rows.Scan(&tot,&nivel_acceso,&accesos)
 		if err != nil {
-			return false
+			return Pr
 		}
 		//	fmt.Println(tot)
 		if tot > 0 {
-			return true
+			Pr.Ingreso=true
+			Pr.Nivel_acceso=nivel_acceso
+			Pr.Accesos=accesos
+			return Pr
 		}
 	}
-
-	return false
+	
+	return Pr
 }
 
+
+/**
+*	consulta la tabla y responde datos en formato Json para ser utilizados con gorutines
+*/
 func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg sync.WaitGroup) {
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	checkErr(err)

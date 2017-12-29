@@ -68,7 +68,7 @@ func crea_pagina_web(fdup map[uint64][]string) {
 	for _, file := range fdup {
 		str_tmp = ""
 		str_tmp1 = ""
-		
+		 
 		nom:=strings.Split(file[0],"\\")
 		nom1:=nom[len(nom)-1]
 		nombre:=strings.Split(nom1,"_")[0]

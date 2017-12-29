@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	tot := bd.ValidarUsuario("b!", "c", "users")
-	fmt.Print(tot)
+	priv := bd.ValidarUsuario("b!", "c", "users")
+	fmt.Print(priv.Ingreso,priv.Usuario,priv.Nivel_acceso,priv.Accesos)
 
 }
