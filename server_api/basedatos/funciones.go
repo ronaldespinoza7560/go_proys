@@ -13,27 +13,35 @@ import (
 	//bd "github.com/ronaldespinoza7560/go_proys/server_api/basedatos"
 )
 
-func checkErr(err error) (string, error) {
-
-	return "", nil
+func checkErr(err error) ([]map[string]interface{}, error) {
+	tab := make([]map[string]interface{}, 0)
+	return tab, nil
 }
 
-func GetJSON(sqlString string) (string, error) {
+func GetJSON(sqlString string) ([]map[string]interface{}, error) {
+	
+	tableData := make([]map[string]interface{}, 0)
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
-	checkErr(err)
+	if err != nil {
+		return tableData, err
+	}
 	defer db.Close()
 	stmt, err := db.Prepare(sqlString)
-	checkErr(err)
+	if err != nil {
+		return tableData, err
+	}
 	defer stmt.Close()
 
 	rows, err := stmt.Query()
-	checkErr(err)
+	if err != nil {
+		return tableData, err
+	}
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	checkErr(err)
 
-	tableData := make([]map[string]interface{}, 0)
+	
 
 	count := len(columns)
 	values := make([]interface{}, count)
@@ -45,7 +53,7 @@ func GetJSON(sqlString string) (string, error) {
 	for rows.Next() {
 		err := rows.Scan(scanArgs...)
 		if err != nil {
-			return "", err
+			return tableData, err
 		}
 
 		entry := make(map[string]interface{})
@@ -63,10 +71,10 @@ func GetJSON(sqlString string) (string, error) {
 		tableData = append(tableData, entry)
 	}
 
-	jsonData, err := json.Marshal(tableData)
-	checkErr(err)
+	// jsonData, err := json.Marshal(tableData)
+	// checkErr(err)
 
-	return string(jsonData), nil
+	return tableData, nil
 }
 /**
 * valida el usuario y reponde con una structura 
