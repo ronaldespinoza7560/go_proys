@@ -34,13 +34,19 @@ import (
 
 func StartServer() {
 	host:="localhost"
-	port:="8080"
+	port:="8081"
 
 	mux := http.NewServeMux()
 	
 	mux.HandleFunc("/login", mj.LoginHandler)
 	
-	mux.HandleFunc("/xx", mj.Bts_alarmasHandler1)
+	mux.HandleFunc("/xx", mj.Bts_alarmasHandler_xx)
+
+	mux.Handle("/yy", negroni.New(
+		negroni.HandlerFunc(mj.ValidateTokenMiddleware),
+		negroni.Wrap(http.HandlerFunc(mj.Bts_alarmasHandler_yy)),
+	))
+		
 	// Protected Endpoints
 
 	mux.Handle("/resource", negroni.New(

@@ -26,8 +26,9 @@ func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 	// JsonResponse(response, w)
 	fmt.Println(UserPrivilegios)
 	fmt.Println(UserPrivilegios.user)
-	consulta := "SELECT * FROM " + "tp_suspendidos limit 2"
-	resultado, err := bd.GetJSON(consulta)
+	consultas:=[]string{"SELECT * FROM " + "tp_suspendidos limit 2"}
+	//consulta := "SELECT * FROM " + "tp_suspendidos limit 2"
+	resultado, err := bd.Get_datos_db(consultas)
 	if err!=nil{
 		entry := make(map[string]interface{})
 		entry["ERROR"] = "hubo un error en la consulta"
@@ -38,8 +39,8 @@ func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func Bts_alarmasHandler(w http.ResponseWriter, r *http.Request) {
-	consulta := "SELECT * FROM " + "tp_suspendidos limit 20"
-	resultado, err := bd.GetJSON(consulta)
+	consultas := []string{"SELECT * FROM " + "tp_suspendidos limit 5"}
+	resultado, err := bd.Get_datos_db(consultas)
 	if err!=nil{
 		entry := make(map[string]interface{})
 		entry["ERROR"] = "hubo un error en la consulta"
@@ -49,10 +50,10 @@ func Bts_alarmasHandler(w http.ResponseWriter, r *http.Request) {
 	JsonResponse(resultado, w)
 }
 
-func Bts_alarmasHandler1(w http.ResponseWriter, r *http.Request) {
+func Bts_alarmasHandler_xx(w http.ResponseWriter, r *http.Request) {
 	
-	consulta := CrearQuery(r)
-	resultado, err := bd.GetJSON(consulta)
+	consultas := CrearQuery(r)
+	resultado, err := bd.Get_datos_db(consultas)
 	if err!=nil{
 		entry := make(map[string]interface{})
 		entry["ERROR"] = "hubo un error en la consulta"
@@ -61,21 +62,69 @@ func Bts_alarmasHandler1(w http.ResponseWriter, r *http.Request) {
 	JsonResponse(resultado, w)
 }
 
-func CrearQuery(r *http.Request)(string){
+
+func Bts_alarmasHandler_yy(w http.ResponseWriter, r *http.Request) {
+	
+	consulta := CrearQuery(r)
+	resultado, err := bd.Inserta_actualiza_registros_db(consulta)
+	if err!=nil{
+		entry := make(map[string]interface{})
+		entry["ERROR"] = "hubo un error en la consulta"
+		JsonResponse(entry, w)
+	}
+	fmt.Println(UserPrivilegios)
+	JsonResponse(resultado, w)
+}
+
+
+func CrearQuery(r *http.Request)([]string){
+	
 	
 	var userQuery UserConsulta
 	var query_string=""
+	var consultas_db []string
+	
 	err := json.NewDecoder(r.Body).Decode(&userQuery)
 	if err!=nil{
-		return ""
+		return consultas_db
 	}
 
-	if userQuery.NombreConsulta == "extraer_alarmas"{
+	switch userQuery.NombreConsulta {
+		//extrae alarmas
+	case "extraer_alarmas":
 		query_string=`select * from bts_alarmas where
 		cell_name in (select SiteName from bts_latlon where clave like "%dis:rimac%") limit 20`
-	}
+		consultas_db = append(consultas_db, query_string)
 
-	return query_string
+		//extrae bts
+	case "extraer_bts":
+		query_string=`select * from bts_latlon
+		limit 10`
+		consultas_db = append(consultas_db, query_string)
+
+		//extrae network elements
+	case "extraer_ne":
+		query_string=`select * from bts_ne
+		limit 10`
+		consultas_db = append(consultas_db, query_string)
+
+		//insertar un registro a la tabla usuario
+	case "insertar_usuario":
+		query_string=`INSERT INTO users (name,email,password ) VALUES ('aaaaaaa','bbbbbsadfb','ccccccccccc')`
+		consultas_db = append(consultas_db, query_string)
+
+	case "insertar_usuarios":
+		query_string=`INSERT INTO users (name,email,password ) VALUES ('aaaaaaa','bbbbbsadfb','ccccccccccc')`
+		consultas_db = append(consultas_db, query_string)
+		query_string=`INSERT INTO users (name,email,password ) VALUES ('dddd','eeee','ffff')`
+		consultas_db = append(consultas_db, query_string)
+
+	default:
+		query_string=""
+		consultas_db = append(consultas_db, query_string)
+	}
+	
+	return consultas_db
 
 }
 

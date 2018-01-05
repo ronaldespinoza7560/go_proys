@@ -20,10 +20,8 @@ import (
 	
 )
 
-// var claim_user string
-// var claim_nivel_acceso string
-// var claim_accesos string
 var tabla_usuarios string = "users"
+
 
 type UserPriv struct {
 	user string
@@ -150,20 +148,10 @@ func ValidateTokenMiddleware(w http.ResponseWriter, r *http.Request, next http.H
 			return verifyKey, nil
 		})
 	
-		//fmt.Println(Token.Claims)
-		Cx := Token.Claims.(jwt.MapClaims)
-				
-		// claim_user = fmt.Sprintf("%s", Cx["usuario"])
-		// claim_nivel_acceso = fmt.Sprintf("%s", Cx["nivel_acceso"])
-		// claim_accesos = fmt.Sprintf("%s", Cx["accesos"])
-		
-		UserPrivilegios=UserPriv{fmt.Sprintf("%s", Cx["usuario"]),fmt.Sprintf("%s", Cx["nivel_acceso"]),fmt.Sprintf("%s", Cx["accesos"])}
-		//fmt.Println(UserPrivilegios)
-		
-		//claim_user.usuario=Token.Claims["usuario"]
-
 	if err == nil {
 		if Token.Valid {
+			Cx := Token.Claims.(jwt.MapClaims)
+			UserPrivilegios=UserPriv{fmt.Sprintf("%s", Cx["usuario"]),fmt.Sprintf("%s", Cx["nivel_acceso"]),fmt.Sprintf("%s", Cx["accesos"])}
 			next(w, r)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)

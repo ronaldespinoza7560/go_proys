@@ -18,15 +18,15 @@ func checkErr(err error) ([]map[string]interface{}, error) {
 	return tab, nil
 }
 
-func GetJSON(sqlString string) ([]map[string]interface{}, error) {
-	
+func Get_datos_db(sqlString []string) ([]map[string]interface{}, error) {
+
 	tableData := make([]map[string]interface{}, 0)
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	if err != nil {
 		return tableData, err
 	}
 	defer db.Close()
-	stmt, err := db.Prepare(sqlString)
+	stmt, err := db.Prepare(sqlString[0])
 	if err != nil {
 		return tableData, err
 	}
@@ -76,6 +76,39 @@ func GetJSON(sqlString string) ([]map[string]interface{}, error) {
 
 	return tableData, nil
 }
+
+
+/**
+* Actualiza inserta un grupo de registros en la base de datos 
+* recibe como parametro un arreglo de queries 
+*/
+func Inserta_actualiza_registros_db(sqlString []string) ([]map[string]interface{}, error) {
+
+	tableData := make([]map[string]interface{}, 0)
+
+	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
+	if err != nil {
+		return tableData, err
+	}
+	defer db.Close()
+	
+	tx, err := db.Begin()
+
+	for _, element := range sqlString {
+		rows, err := db.Query(element)
+		if err != nil {
+			tx.Rollback()
+			return tableData, nil
+		}
+		defer rows.Close()
+	}
+	
+	tx.Commit()
+	
+	return tableData, nil
+}
+
+
 /**
 * valida el usuario y reponde con una structura 
 * acceso: bool
