@@ -18,6 +18,7 @@ func checkErr(err error) ([]map[string]interface{}, error) {
 	return tab, nil
 }
 
+//retorna una tabla con los datos de la consulta realizada
 func Get_datos_db(sqlString []string) ([]map[string]interface{}, error) {
 
 	tableData := make([]map[string]interface{}, 0)
