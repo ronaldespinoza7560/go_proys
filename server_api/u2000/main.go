@@ -3,6 +3,7 @@ import (
 	"fmt"
 	"time"
 	fu "github.com/ronaldespinoza7560/go_proys/server_api/u2000/funciones"
+	bd "github.com/ronaldespinoza7560/go_proys/server_api/basedatos"
 )
 
 const (
@@ -25,75 +26,106 @@ func main() {
 
 	cs := make(chan []string)
 	
-	fu.Wg.Add(1)
-	go genera_channel(cs)
+	//query_nes:="select ne_name from network_elements where ne_name like '%mbts%' limit 400"
+	query_nes:="select ne_name from network_elements"
+	//query_nes:="select ne_name from network_elements where id > 3850"
+	nro_nes:=20
+	nro_de_gorutines:=10
+	tabla:="bts_alarmas"  //tabla donde se almacenara las alarmas.
 
-	for i:=0;i<2;i++{
+	//genera el canal con nelemes agrupados en arreglos de nro_nes
+	fu.Wg.Add(1)
+	go genera_channel(cs, query_nes, nro_nes)
+
+	for i:=0;i<nro_de_gorutines;i++{
 		fu.Wg.Add(1)
-		go extrae_alarmas_y_los_procesa(cs)
+		go extrae_alarmas_y_los_procesa(cs, tabla)
 	}
-	
-	
+		
 	fu.Wg.Wait()
 	
-
-	
-
 	tiempo := time.Now()
   	elapsed := tiempo.Sub(start)
   	fmt.Println(elapsed)
 }
-func genera_channel(out chan []string){
-	//ejecuta comandos para registrar los ne y mostrar sus alarmas
-	net_elems:=[]string{"BSC01","ACT4371_Paccaritambo","MBTS_AP3693_PLAZA_AYAVIRI",
-	"MBTS_TP6340_LUIS_MONTERO",
-	"MBTS_TP6341_BUENOS_AIRES_SULLANA",
-	"MBTS_TP6342_JOSE_MARIA_PIURA",
-	"MBTS_TP6343_ESTADIO_SULLANA",
-	"MBTS_TP6345_TRES_CABALLOS"}
-	net_elems1:=[]string{"MBTS_TP6349_LANCONES",
-	"MBTS_TP6350_LETIRA",
-	"MBTS_TP6351_LA_PENITA",
-	"MBTS_TP6352_AMOTAPE",
-	"MBTS_TP6353_CHOCANCITO",}
 
-	net_elems2:=[]string{"MBTS_TP6202_SAGA_FALABELLA_PIURA",
-	"MBTS_TP6205_PLAYA_LOBITOS",
-	"MBTS_TP6212_CURA_MORI",
-	"MBTS_TP6251_SULLANA",
-	"MBTS_TP6252_SULLANA_AMBEV",
-	"MBTS_TP6255_CRUSETA",}
-	net_elems3:=[]string{"MBTS_TP6257_SANTA_CRUZ_KM_50",
-	"MBTS_TP6258_FAIQUE",
-	"MBTS_TP6259_SANTO_DOMINGO_DE_CHILACO",
-	"MBTS_TP6260_PUEBLO_NUEVO_COLAN",
-	"MBTS_TP6261_MONTERO",
-	"MBTS_TP6266_TRUCK_ECO_ACUICOLA",}
-	out <- net_elems
-	out <- net_elems1
-	out <- net_elems2
-	out <- net_elems3
+/**
+* genera un canal con arreglo de network elemenst agrupados de acuerdo al nro_nes
+* y recibe como entrada el query a la base de datos de netelems y la cantidad de ne elemenst que se agruparan.
+*/
+func genera_channel(out chan []string, query_ne string, nro_nes int ){
+	querySelecs := []string{query_ne}
+	tab, err := bd.Get_datos_db(querySelecs)
+	if err !=nil{
+		fmt.Println("err")
+	}
+	tab_n:=agrupa_nelems(tab, nro_nes)
+
+	//coloca en el canal los arreglos de network elements
+	for _,nelems := range tab_n{
+		out <- nelems
+	}
+
 	fu.Wg.Done()
 	close(out)
 }
-func extrae_alarmas_y_los_procesa(in chan []string){
+
+/**
+* agrupa los network elements de la consulta  a la base de datos y retorna un 
+*arreglo de arreglos de network elemenst
+*/
+func agrupa_nelems(tab []map[string]interface{}, k int)([][]string){
+	var rsets =[][]string{}
+	var rset= []string{}
 	
+	cad:=""
+	i:=1
+	for _,v := range tab{
+		cad=v["ne_name"].(string)
+		rset=append(rset,cad)
+		if !(i<k){
+			rsets=append(rsets,rset)
+			rset=nil
+			i=0
+		}
+		i++
+	}
+	if len(rset)>0{
+		rsets=append(rsets,rset)
+	}
+	return rsets
+}
+
+/**
+* extrae alarmas del u2000 y los procesa
+* recibe como entrada un arreglo de netelements
+*/
+func extrae_alarmas_y_los_procesa(in chan []string,tabla string){
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in extrae_alarmas_y_los_procesa", r)
+        }
+    }()
 	//se loguea al u2000 para extraer las alarmas
 	for net_elems := range in{
-	
+		fu.Mux.Lock()
 		t,err:=fu.Loguear_u2000()
 		print_err(err,Error_logueo)
-
+		fu.Mux.Unlock()
 		for _, nelem := range net_elems {
 			//fmt.Println(nelem)
 			
 			alarms :=  fu.Recupera_alarmas_u2000(t,nelem)
 			//print_err(err1,Error_recu_alarms)
 			fu.Wg.Add(1)
-			go fu.Procesar_alarmas_u2000(nelem,alarms)
+			go fu.Procesar_alarmas_u2000(nelem,alarms,tabla)
 		
 		}
+		fu.Mux.Lock()
 		t.Write("exit\n")
+		fu.Mux.Unlock()
+		
+
 	}		
 	
 	fu.Wg.Done()

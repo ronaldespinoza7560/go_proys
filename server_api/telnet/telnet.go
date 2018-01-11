@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"fmt"
 )
 
 // Telnet presents struct with net.Conn interface for telnet protocol plus buffered reader and timeout setup
@@ -99,6 +100,11 @@ func (t Telnet) Read_con_tiempo(expect string , tiempo int) (str string, err err
 
 // Write writes string (command or data) to telnet device. Do not forget add LF to end of string!
 func (t Telnet) Write(s string) (i int, err error) {
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in telnet", r)
+        }
+    }()
 	t.conn.SetWriteDeadline(time.Now().Add(t.timeout))
 	i, err = t.conn.Write([]byte(s))
 	return

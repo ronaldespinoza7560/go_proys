@@ -1,6 +1,7 @@
 package basedatos
 
 import (
+	"fmt"
 	"database/sql"
 	"encoding/json"
 	"sync"
@@ -20,27 +21,34 @@ func checkErr(err error) ([]map[string]interface{}, error) {
 
 //retorna una tabla con los datos de la consulta realizada
 func Get_datos_db(sqlString []string) ([]map[string]interface{}, error) {
-
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in Get_datos_db", r)
+        }
+    }()
 	tableData := make([]map[string]interface{}, 0)
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	if err != nil {
-		return tableData, err
+		fmt.Println("error al abrir mysql")
+		return tableData, nil
 	}
 	defer db.Close()
-	stmt, err := db.Prepare(sqlString[0])
-	if err != nil {
-		return tableData, err
+	stmt, err1 := db.Prepare(sqlString[0])
+	if err1 != nil {
+		fmt.Println("error al preparar el stmt",sqlString[0])
+		return tableData, nil
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query()
-	if err != nil {
-		return tableData, err
+	rows, err2 := stmt.Query()
+	if err2 != nil {
+		fmt.Println("error al ejecutarl el query",sqlString)
+		return tableData, nil
 	}
 	defer rows.Close()
 
-	columns, err := rows.Columns()
-	checkErr(err)
+	columns, err3 := rows.Columns()
+	checkErr(err3)
 
 	
 
@@ -52,9 +60,10 @@ func Get_datos_db(sqlString []string) ([]map[string]interface{}, error) {
 	}
 
 	for rows.Next() {
-		err := rows.Scan(scanArgs...)
-		if err != nil {
-			return tableData, err
+		err4 := rows.Scan(scanArgs...)
+		if err4 != nil {
+			fmt.Println("error en rows.Scan")
+			return tableData, nil
 		}
 
 		entry := make(map[string]interface{})
@@ -84,21 +93,31 @@ func Get_datos_db(sqlString []string) ([]map[string]interface{}, error) {
 * recibe como parametro un arreglo de queries 
 */
 func Inserta_actualiza_registros_db(sqlString []string) ([]map[string]interface{}, error) {
-
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in Inserta_actualiza_registros_db", r)
+        }
+    }()
 	tableData := make([]map[string]interface{}, 0)
 
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	if err != nil {
-		return tableData, err
+		fmt.Println("error al abrir mysql")
+		return tableData, nil
 	}
 	defer db.Close()
 	
-	tx, err := db.Begin()
+	tx, err1 := db.Begin()
+	if err1 != nil {
+		fmt.Println("error al comenzar la transaccion")
+		return tableData, nil
+	} 
 
 	for _, element := range sqlString {
-		rows, err := db.Query(element)
-		if err != nil {
+		rows, err2 := db.Query(element)
+		if err2 != nil {
 			tx.Rollback()
+			fmt.Println("error al ejecutar el query",element)
 			return tableData, nil
 		}
 		defer rows.Close()
@@ -123,6 +142,11 @@ type privilegios struct {
 }
 
 func ValidarUsuario(nom string, clave string, table string) privilegios {
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in ValidarUsuario", r)
+        }
+    }()
 	Pr:=privilegios{Ingreso:false,Usuario:nom,Nivel_acceso:"",Accesos:""}
 	
 	//var sqlString string
@@ -171,19 +195,24 @@ func ValidarUsuario(nom string, clave string, table string) privilegios {
 *	consulta la tabla y responde datos en formato Json para ser utilizados con gorutines
 */
 func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg sync.WaitGroup) {
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in GetJSON_con_gorutines", r)
+        }
+    }()
 	db, err := sql.Open("mysql", Usuario+":"+Password+"@tcp("+Host+")/"+Dbname)
 	checkErr(err)
 	defer db.Close()
-	stmt, err := db.Prepare(sqlString)
-	checkErr(err)
+	stmt, err1 := db.Prepare(sqlString)
+	checkErr(err1)
 	defer stmt.Close()
 
-	rows, err := stmt.Query()
-	checkErr(err)
+	rows, err2 := stmt.Query()
+	checkErr(err2)
 	defer rows.Close()
 
-	columns, err := rows.Columns()
-	checkErr(err)
+	columns, err3 := rows.Columns()
+	checkErr(err3)
 
 	tableData := make([]map[string]interface{}, 0)
 
@@ -195,8 +224,8 @@ func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg 
 	}
 
 	for rows.Next() {
-		err := rows.Scan(scanArgs...)
-		checkErr(err)
+		err4 := rows.Scan(scanArgs...)
+		checkErr(err4)
 
 		entry := make(map[string]interface{})
 		for i, col := range columns {
@@ -213,8 +242,8 @@ func GetJSON_con_gorutines(sqlString string, Resultados map[string][]string, wg 
 		tableData = append(tableData, entry)
 	}
 
-	jsonData, err := json.Marshal(tableData)
-	checkErr(err)
+	jsonData, err5 := json.Marshal(tableData)
+	checkErr(err5)
 	Resultados["consulta1"] = append(Resultados["consulta1"], string(jsonData))
 	wg.Done()
 	//return string(jsonData), nil
