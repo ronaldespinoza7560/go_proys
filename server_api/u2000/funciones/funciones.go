@@ -7,42 +7,13 @@ import(
 	"strings"
 	"regexp"
 	"time"
+	"bytes"
 	
 )
 
 //funcion que se conecta al u2000
-func Loguear_u2000()(t telnet.Telnet, err error){
-	defer func() {
-        if r := recover(); r != nil {
-            fmt.Println("Recovered in Loguear_u2000", r)
-        }
-    }()
-	defer func() {
-        if r := recover(); r != nil {
-            fmt.Println("Recovered - Loguear_u2000", r)
-        }
-    }()
-	consulta_claves:=[]string{"SELECT * FROM clave limit 1"}
-	claves_u2000, err := bd.Get_datos_db(consulta_claves)
-	if err!=nil{
-		fmt.Println("error al conseguir la clave")
-
-		time.Sleep(100 * time.Millisecond)
-		claves_u2000, err = bd.Get_datos_db(consulta_claves)
-		if err!=nil{
-			claves_u2000=nil
-			err=nil
-			fmt.Println("error al conseguir la clave")
-			return
-		}
-		
-	}
-	ip_u2000:=claves_u2000[0]["ip_u2000_wireless"].(string)
-	port_u2000:=claves_u2000[0]["port_u2000_wireless"].(string)
-	user_u2000:=claves_u2000[0]["user_u2000_wireless"].(string)
-	clave_u2000:=claves_u2000[0]["clave_u2000_wireless"].(string)
+func Loguear_u2000(ip_u2000 string,port_u2000 string,user_u2000 string,clave_u2000 string)(t telnet.Telnet, err error){
 	
-
 	t1, err3 := telnet.Dial(ip_u2000+":"+port_u2000)
 	if err3 != nil {
 		fmt.Println(err)
@@ -250,4 +221,184 @@ func borrar_alarmas_celdas(tabla string,ne_name string){
 	Mux.Lock()
 	bd.Inserta_actualiza_registros_db(qq_borrar)
 	Mux.Unlock()
+}
+
+//recupera ne del u200 y los guarda en la tabla de la base de datos.
+func Recupera_network_elements_u2000_y_guarda_en_db(t telnet.Telnet,tabla string){
+	lst_ne:="LST NE:;\r\n"
+	fmt.Println(tabla)	
+	t.Write(lst_ne)
+	ne1, err := t.Read_con_tiempo("---    END",60)
+	if err != nil {
+		err=nil
+		fmt.Println("reg ne no responde",lst_ne)
+	}
+	
+	//limpia la tabla network elements
+	qq_insertar:=[]string{"DROP TABLE IF EXISTS "+tabla+"_copia;",
+	"RENAME TABLE  "+tabla+" TO  "+tabla+"_copia;",
+	"CREATE TABLE "+tabla+" LIKE "+tabla+"_copia;",}
+	//fmt.Println(qq_insertar)
+	bd.Inserta_actualiza_registros_db(qq_insertar)
+
+
+	data:=[]byte(ne1)
+	re := regexp.MustCompile("  +")
+	replaced := re.ReplaceAll(bytes.TrimSpace(data), []byte(" "))
+    
+	ne2:=strings.Split(string(replaced),"\r\n")
+	var ne3 []string
+	re1 := regexp.MustCompile("[;, ] *")
+	for _,v:=range ne2{
+		
+		ne3=re1.Split(strings.Trim(v," "),-1)
+		if len(ne3)>2{
+			switch ne3[0] {
+				case
+					"+++",
+					"%%LST",
+					"RETCODE",
+					"LST",
+					"NE":
+					continue
+				}
+			ne_type:=ne3[0]
+			ne_name:=ne3[1]
+			ip_address:=ne3[2]
+			estado:="operativo"
+			hoy := time.Now().Format(time.RFC3339)
+			updated_at:=hoy
+			created_at:=hoy
+			insertar_ne_a_db(tabla,ne_type,ne_name,ip_address,estado,updated_at,created_at)
+	//		fmt.Println(tabla,ne_type,ne_name,ip_address,estado,updated_at,created_at)
+		}
+	}
+}
+
+func insertar_ne_a_db(tabla,ne_type,ne_name,ip_address,estado,updated_at,created_at string){
+	tabla_ne:=tabla
+	qq_insertar:=[]string{"INSERT INTO "+tabla_ne +" (ne_type,ne_name,ip_address,estado,updated_at,created_at)"+
+	"VALUES ('"+ne_type+"','"+ne_name+"','"+ip_address+"','"+estado+"','"+updated_at+"','"+created_at+"')"}
+	
+	bd.Inserta_actualiza_registros_db(qq_insertar)
+	
+}
+
+//recupera bts_ne del u2000
+func Recupera_bts_ne_u2000(t telnet.Telnet,nelem string,ne_type string)(string){
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in Recupera_alarmas_u2000", r)
+        }
+    }()
+		reg_ne:="REG NE:NAME="+nelem+";\r\n"
+		
+		t.Write(reg_ne)
+		s1, err := t.Read_con_tiempo("---    END",5)
+		if err != nil {
+			err=nil
+			fmt.Println("reg ne no responde",reg_ne)
+			return ""
+		}
+		if strings.Index(s1, "NE does not Connection")>0{
+			fmt.Println("NE does not Connection",reg_ne)
+			return ""
+		}
+		if strings.Index(s1, "t Found NE")>0{
+			fmt.Println("t Found NE",reg_ne)
+			return ""
+		}
+		
+		out2,out3,out4,err :="","","",nil
+
+		if strings.Index(s1, "t Found NE")<0{
+			if ne_type=="BSC6900GSMNE" || ne_type=="BSC6910GSMNE"{
+				t.Write("LST BTS:;\r\n")
+				out2,err = t.Read_con_tiempo("reports in total", 40)
+				if err != nil {
+					fmt.Println(err)
+				}
+			//	extraer_btss(out2,nelem,ne_type)
+			}
+			if ne_type=="BSC6900UMTSNE"{
+				t.Write("LST UNODEB:LSTFORMAT=HORIZONTAL;\r\n")
+				out2,err = t.Read_con_tiempo("reports in total", 30)
+				if err != nil {
+					fmt.Println(err)
+				}
+			//	extraer_btss(out2,nelem,ne_type)
+			}
+			if ne_type=="BSC6910UMTSNE"{
+				if nelem =="LIMRNC09"{
+					t.Write("LST UNODEB:LOGICRNCID=1009,LSTFORMAT=HORIZONTAL;\r\n")
+					out2,err = t.Read_con_tiempo("reports in total", 30)
+					if err != nil {
+						fmt.Println(err)
+					}
+					//extraer_btss(out2,nelem,ne_type)
+				}
+                        
+				if nelem =="LIMRNC10"{
+					t.Write("LST UNODEB:LOGICRNCID=1010,LSTFORMAT=HORIZONTAL;\r\n")
+					out2,err = t.Read_con_tiempo("reports in total", 30)
+					if err != nil {
+						fmt.Println(err)
+					}
+				//    extraer_btss(out2,nelem,ne_type)
+				}
+				if nelem =="LIMRNC11"{
+					t.Write("LST UNODEB:LOGICRNCID=1011,LSTFORMAT=HORIZONTAL;\r\n")
+					out2,err = t.Read_con_tiempo("reports in total", 30)
+					if err != nil {
+						fmt.Println(err)
+					}
+				//    extraer_btss(out2,nelem,ne_type)
+				}
+				if nelem =="LIMRNC12"{
+					t.Write("LST UNODEB:LOGICRNCID=1012,LSTFORMAT=HORIZONTAL;\r\n")
+					out2,err = t.Read_con_tiempo("reports in total", 30)
+					if err != nil {
+						fmt.Println(err)
+					}
+					//   extraer_btss(out2,nelem,ne_type)
+				}
+			}
+			if ne_type=="BTS3900NE"{
+				t.Write("LST NODEBFUNCTION:;\r\n")
+				out2,err = t.Read_con_tiempo("---    END", 30)
+				if err != nil {
+					fmt.Println(err)
+				}
+				if strings.Index(out2, "does not exist") >= 0{
+					out2=""
+				}
+                        
+                    
+                t.Write("LST ENODEBFUNCTION:;\r\n")
+                out3,err = t.Read_con_tiempo("---    END", 30)
+                if err != nil {
+					fmt.Println(err)
+				}
+				if strings.Index(out3, "does not exist") >= 0{
+					out3=""
+				}
+
+                t.Write("LST GBTSFUNCTION:;\r\n")
+                out4,err = t.Read_con_tiempo("---    END", 30)
+                if err != nil {
+					fmt.Println(err)
+				}
+				if strings.Index(out4, "does not exist") >= 0{
+					out4=""
+				}
+
+                out2=out2+out3+out4
+                //extraer_btss(out5,ne,ne_type)
+                
+			}
+
+		}
+       
+	return out2
+	
 }
