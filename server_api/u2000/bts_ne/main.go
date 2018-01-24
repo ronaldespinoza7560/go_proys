@@ -1,10 +1,12 @@
 package main
 import (
+	"strconv"
 	"fmt"
 	"time"
 	fu "github.com/ronaldespinoza7560/go_proys/server_api/u2000/funciones"
 	bd "github.com/ronaldespinoza7560/go_proys/server_api/basedatos"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -27,19 +29,30 @@ type datos_u2000 struct{
 	clave string
 
 }
+type Ne_name_type struct{
+	ne_name string
+	ne_type string
+}
 
 func main() {
 	start := time.Now()
+
+	nro_nes:=20					//numero de network elements a agrupar
+	nro_de_gorutines:=10		//nro de goroutine que se correran simultaneamente
+	tabla:="bts_ne"  			//tabla donde se almacenara las alarmas.
+	
 	var u2000 datos_u2000
 
 	cs := make(chan []Ne_name_type)
 	
-	//query_nes:="select ne_name from network_elements where ne_name like '%mbts%' limit 400"
-	query_nes:="select ne_type,ne_name from network_elements where ne_type like '%BTS3900NE%' limit 10"
-	//query_nes:="select ne_name from network_elements where id > 3850"
-	nro_nes:=3
-	nro_de_gorutines:=3
-	tabla:="bts_ne"  //tabla donde se almacenara las alarmas.
+	//query_nes:="select ne_type,ne_name from network_elements where ne_name like '%mbts%' limit 10"
+	//query_nes:="select ne_type,ne_name from network_elements where ne_name like '%HCAJBSC01%'"
+	//query_nes:="select ne_type,ne_name from network_elements where id > 3850"
+	query_nes:="select ne_type,ne_name from network_elements where ne_type not like '%NodeBNE%'"
+	
+	
+	qqs:="select ne_type,ne_name from network_elements where ne_type = 'NodeBNE'"
+	recupera_NodeBNE(qqs,tabla)
 
 	//extrae la clave del u2000
 	consulta_claves:=[]string{"SELECT * FROM clave limit 1"}
@@ -63,10 +76,37 @@ func main() {
 	}
 		
 	fu.Wg.Wait()
+	fmt.Println("Limpia_la_tabla_bts_ns_de_registros_duplicados de "+tabla)
+	fu.Limpia_la_tabla_bts_ns_de_registros_duplicados(tabla)
 	
 	tiempo := time.Now()
   	elapsed := tiempo.Sub(start)
   	fmt.Println(elapsed)
+}
+
+
+
+/**
+* genera un canal con arreglo de network elemenst agrupados de acuerdo al nro_nes
+* y recibe como entrada el query a la base de datos de netelems y la cantidad de ne elemenst que se agruparan.
+*/
+func recupera_NodeBNE(query_ne string,tabla string){
+	//fmt.Println(query_ne)
+	querySelecs := []string{query_ne}
+	tab, err := bd.Get_datos_db(querySelecs)
+	if err !=nil{
+		fmt.Println("err")
+	}
+	hoy := time.Now().Format(time.RFC3339)
+	updated_at:=hoy
+	created_at:=hoy
+	tecnologia:=""
+	for _,nelems := range tab{
+		ne:=strings.Split(nelems["ne_name"].(string),"_")
+		//fmt.Println(nelems["ne_type"].(string),nelems["ne_name"].(string),ne[0],updated_at,created_at,tecnologia)
+		fu.Guardar_bts_en_db(tabla,nelems["ne_type"].(string),nelems["ne_name"].(string),ne[0],updated_at,created_at,tecnologia)
+		
+	}
 }
 
 /**
@@ -80,7 +120,7 @@ func genera_channel(out chan []Ne_name_type, query_ne string, nro_nes int ){
 		fmt.Println("err")
 	}
 	tab_n:=agrupa_nelems(tab, nro_nes)
-	fmt.Println(tab_n)
+	//fmt.Println(tab_n)
 	//coloca en el canal los arreglos de network elements
 	for _,nelems := range tab_n{
 		out <- nelems
@@ -94,10 +134,7 @@ func genera_channel(out chan []Ne_name_type, query_ne string, nro_nes int ){
 * agrupa los network elements de la consulta  a la base de datos y retorna un 
 *arreglo de arreglos de network elemenst
 */
-type Ne_name_type struct{
-	ne_name string
-	ne_type string
-}
+
 func agrupa_nelems(tab []map[string]interface{}, k int)([][]Ne_name_type){
 
 	var rsets = [][]Ne_name_type{}
@@ -105,9 +142,12 @@ func agrupa_nelems(tab []map[string]interface{}, k int)([][]Ne_name_type){
 	var elem Ne_name_type
 	i:=1
 	for _,v := range tab{
-		elem.ne_name=v["ne_name"].(string)
-		elem.ne_type=v["ne_type"].(string)
-
+		if v["ne_name"] !=nil{
+			elem.ne_name=v["ne_name"].(string)
+		}
+		if v["ne_type"] !=nil{
+			elem.ne_type=v["ne_type"].(string)
+		}
 		rset=append(rset,elem)
 		if !(i<k){
 			rsets=append(rsets,rset)
@@ -115,6 +155,8 @@ func agrupa_nelems(tab []map[string]interface{}, k int)([][]Ne_name_type){
 			i=0
 		}
 		i++
+		
+		
 	}
 	if len(rset)>0{
 		rsets=append(rsets,rset)
@@ -179,7 +221,10 @@ func Procesar_bts_ne_u2000(nelem Ne_name_type,data_cruda string, tabla string){
 	
 	rem := regexp.MustCompile("[A-Z][A-Z][A-Z|0-9][0-9]+")
 	
-	btss0:=[]string{}
+	//btss0:=[]string{}
+	//fmt.Println(btss)
+	set := make(map[string]struct{})
+    
 	for _,x :=range btss{
 		if rem.MatchString(x)&&len(x)>5&&len(x)<11 {
 			switch x {
@@ -187,17 +232,22 @@ func Procesar_bts_ne_u2000(nelem Ne_name_type,data_cruda string, tabla string){
 				"DBS3900","BTS3900","BTS3900B","BTS3900E":
 					continue
 				}
-				btss0=append(btss0,x)	
+				if _, err := strconv.ParseInt(string(x[3]), 10, 32); err == nil {
+					set[x] = struct{}{}
+				}
+				
 		}
-		
 	}
 
 	hoy := time.Now().Format(time.RFC3339)
 	updated_at:=hoy
 	created_at:=hoy
-    for _,site_name :=range btss0{
-        fmt.Println(nelem.ne_type,nelem.ne_name,site_name,updated_at,created_at)
-		//guardar_bts_en_db(ne_type,ne_name,site_name,updated_at,created_at)
+	//fmt.Println(btss0)
+	tecnologia:=""
+    for site_name :=range set{
+        //fmt.Println(nelem.ne_type,nelem.ne_name,site_name,updated_at,created_at,tecnologia)
+		fu.Guardar_bts_en_db(tabla,nelem.ne_type,nelem.ne_name,site_name,updated_at,created_at,tecnologia)
+		
 	}
 	return
 }
